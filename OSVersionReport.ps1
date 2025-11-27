@@ -186,19 +186,34 @@ if ($clients.Count -eq 0) {
 }
 
 # Load Windows 11 Build Database
-$buildDatabasePath = ".\windows11_builds_full.csv"
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrEmpty($scriptPath)) {
+    $scriptPath = Get-Location
+}
+$buildDatabasePath = Join-Path $scriptPath "windows11_builds_full.csv"
 $buildDatabase = @{}
+
+Write-Host "Script path: $scriptPath" -ForegroundColor Gray
+Write-Host "Looking for database at: $buildDatabasePath" -ForegroundColor Gray
 
 if (Test-Path $buildDatabasePath) {
     $buildData = Import-Csv -Path $buildDatabasePath -Delimiter ';'
+    Write-Host "CSV Columns: $($buildData[0].PSObject.Properties.Name -join ', ')" -ForegroundColor Cyan
+    
     foreach ($build in $buildData) {
-        $buildDatabase[$build.Build] = @{
+        # Trim whitespace from build number
+        $buildKey = $build.Build.Trim()
+        $buildDatabase[$buildKey] = @{
             ReleaseDate = $build.'Release-Datum'
             KB = $build.KB
             Note = $build.Hinweis
         }
     }
     Write-Host "Loaded $($buildDatabase.Count) builds from database" -ForegroundColor Green
+    
+    # Show first few builds for debugging
+    $firstBuilds = ($buildDatabase.Keys | Select-Object -First 5) -join ', '
+    Write-Host "Sample builds in database: $firstBuilds" -ForegroundColor Gray
 } else {
     Write-Warning "Build database not found at $buildDatabasePath - Release dates will not be available"
 }
@@ -225,8 +240,21 @@ foreach ($client in $clients) {
             $featureUpdate = "Unknown"
             $buildReleaseDate = "Unknown"
             if ($device.OSVersion) {
-                $osBuild = $device.OSVersion.Split('.')[2]
-                $osRevision = $device.OSVersion.Split('.')[3]
+                # Convert from Intune format (10.0.26100.7171) to Build format (26100.7171)
+                if ($device.OSVersion -match '10\.0\.(\d+)\.(\d+)') {
+                    $osBuild = $matches[1]
+                    $osRevision = $matches[2]
+                } else {
+                    # Fallback to split method
+                    $parts = $device.OSVersion.Split('.')
+                    if ($parts.Count -ge 4) {
+                        $osBuild = $parts[2]
+                        $osRevision = $parts[3]
+                    } else {
+                        $osBuild = $parts[0]
+                        $osRevision = if ($parts.Count -gt 1) { $parts[1] } else { "0" }
+                    }
+                }
                 
                 # Feature Update Version
                 switch ($osBuild) {
@@ -248,13 +276,25 @@ foreach ($client in $clients) {
                 $kbNumber = "Unknown"
                 $updateType = "Unknown"
                 
-                if ($buildDatabase.ContainsKey($fullBuild)) {
-                    $buildReleaseDate = $buildDatabase[$fullBuild].ReleaseDate
-                    $kbNumber = $buildDatabase[$fullBuild].KB
-                    $updateType = $buildDatabase[$fullBuild].Note
+                Write-Host "  Searching for build: '$fullBuild' in database..." -ForegroundColor Gray
+                
+                # Trim whitespace for lookup
+                $lookupKey = $fullBuild.Trim()
+                
+                if ($buildDatabase.ContainsKey($lookupKey)) {
+                    $buildReleaseDate = $buildDatabase[$lookupKey].ReleaseDate
+                    $kbNumber = $buildDatabase[$lookupKey].KB
+                    $updateType = $buildDatabase[$lookupKey].Note
+                    Write-Host "  ✓ Found build $lookupKey in database" -ForegroundColor Green
                 } else {
                     $buildReleaseDate = "Build not in database"
-                    Write-Host "  ! Build $fullBuild not found in database" -ForegroundColor Yellow
+                    Write-Host "  ! Build '$lookupKey' not found in database (DB has $($buildDatabase.Count) entries)" -ForegroundColor Yellow
+                    
+                    # Show similar builds for debugging
+                    $similarBuilds = $buildDatabase.Keys | Where-Object { $_ -like "$osBuild.*" } | Select-Object -First 3
+                    if ($similarBuilds) {
+                        Write-Host "  Similar builds found: $($similarBuilds -join ', ')" -ForegroundColor Gray
+                    }
                 }
             }
             
