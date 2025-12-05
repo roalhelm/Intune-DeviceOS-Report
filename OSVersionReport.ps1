@@ -12,12 +12,14 @@
     
     The script queries Microsoft Intune for each device and retrieves:
     - Serial Number
+    - Primary User UPN (User Principal Name)
     - Last Check-in Time
     - OS Version and Feature Update Version (22H2, 23H2, 24H2, 25H2)
     - Build Release Date
     - KB Article Number
     - Update Type (Patch Tuesday, Preview Update, OOB, etc.)
     - Hardware Information (Manufacturer, Model)
+    - Free Disk Space (in GB)
     
     Results are displayed in the console and automatically exported to a timestamped CSV file.
     The script uses a comprehensive build database (windows11_builds_full.csv) containing 
@@ -29,13 +31,25 @@
 .NOTES
     File Name      : OSVersionReport.ps1
     Author         : Ronny Alhelm
-    Version        : 1.0
+    Version        : 1.1
     Creation Date  : 2025-11-25
-    Last Modified  : 2025-11-26
+    Last Modified  : 2025-12-05
     Requirements   : PowerShell 7.0 or higher (PowerShell 5.1 minimum)
     Dependencies   : Microsoft.Graph PowerShell Module
     Required Files : windows11_builds_full.csv (build database)
                      Clients.csv (optional, for CSV input method)
+
+.CHANGES
+    Version 1.1 (2025-12-05):
+    - Added Primary User UPN (UserPrincipalName) to report output
+    - Added Free Disk Space in GB (FreeDiscSpaceGB) to report output
+    - Enhanced device information with storage and user details
+    
+    Version 1.0 (2025-11-26):
+    - Initial release with CSV, Manual, and AAD Group input methods
+    - Windows 11 build database with 168+ builds
+    - Feature update version detection (22H2, 23H2, 24H2, 25H2)
+    - KB article and update type information
 
 .PREREQUISITES
     1. Install Microsoft Graph PowerShell Module:
@@ -51,7 +65,7 @@
     Ronny Alhelm with assistance from GitHub Copilot (Claude Sonnet 4.5)
 
 .VERSION
-    1.0 - Initial release with CSV, Manual, and AAD Group input methods
+    1.1 - Added Primary User UPN and Free Disk Space fields
 
 .EXAMPLE
     PS C:\> .\OSVersionReport.ps1
@@ -76,9 +90,9 @@
 
 .OUTPUTS
     CSV File: ClientReport_YYYYMMDD_HHMMSS.csv
-    Contains columns: ComputerName, SerialNumber, LastCheckIn, OSVersion, 
-    FeatureUpdateVersion, BuildReleaseDate, KBNumber, UpdateType, 
-    LastPatchInstalled, OperatingSystem, Model, Manufacturer
+    Contains columns: ComputerName, SerialNumber, PrimaryUserUPN, LastCheckIn, 
+    OSVersion, FeatureUpdateVersion, BuildReleaseDate, KBNumber, UpdateType, 
+    LastPatchInstalled, OperatingSystem, Model, Manufacturer, FreeDiscSpaceGB
 
 .LINK
     GitHub Repository: https://github.com/roalhelm/
@@ -298,9 +312,22 @@ foreach ($client in $clients) {
                 }
             }
             
+            # Calculate free disk space in GB
+            $freeSpaceGB = "Unknown"
+            if ($device.FreeStorageSpaceInBytes) {
+                $freeSpaceGB = [math]::Round($device.FreeStorageSpaceInBytes / 1GB, 2)
+            }
+            
+            # Get Primary User UPN
+            $primaryUserUPN = "Unknown"
+            if ($device.UserPrincipalName) {
+                $primaryUserUPN = $device.UserPrincipalName
+            }
+            
             $deviceInfo = [PSCustomObject]@{
                 ComputerName           = $device.DeviceName
                 SerialNumber           = $device.SerialNumber
+                PrimaryUserUPN         = $primaryUserUPN
                 LastCheckIn            = $device.LastSyncDateTime
                 OSVersion              = $device.OSVersion
                 FeatureUpdateVersion   = $featureUpdate
@@ -311,6 +338,7 @@ foreach ($client in $clients) {
                 OperatingSystem        = $device.OperatingSystem
                 Model                  = $device.Model
                 Manufacturer           = $device.Manufacturer
+                FreeDiscSpaceGB        = $freeSpaceGB
             }
             
             $report += $deviceInfo
@@ -324,6 +352,7 @@ foreach ($client in $clients) {
             $deviceInfo = [PSCustomObject]@{
                 ComputerName           = $clientName
                 SerialNumber           = "Not found"
+                PrimaryUserUPN         = "Not found"
                 LastCheckIn            = $null
                 OSVersion              = "Not found"
                 FeatureUpdateVersion   = "Not found"
@@ -334,6 +363,7 @@ foreach ($client in $clients) {
                 OperatingSystem        = "Not found"
                 Model                  = "Not found"
                 Manufacturer           = "Not found"
+                FreeDiscSpaceGB        = "Not found"
             }
             
             $report += $deviceInfo

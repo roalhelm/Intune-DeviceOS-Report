@@ -13,7 +13,10 @@ A PowerShell script for retrieving detailed Windows 11 device information from M
   - Exact Build Release Date
   - KB Article Number
   - Update Type (Patch Tuesday, Preview, OOB, etc.)
-- **Hardware Information**: Serial number, manufacturer, model
+- **Device Information**: 
+  - Serial number, manufacturer, model
+  - Primary User UPN (User Principal Name)
+  - Free Disk Space (in GB)
 - **Last Check-in Time**: Shows when devices last synced with Intune
 - **CSV Export**: Automatic export with timestamp
 - **Comprehensive Build Database**: Includes Windows 11 builds from 2022-2025
@@ -88,6 +91,7 @@ DESKTOP-004
 |--------|-------------|
 | ComputerName | Device name from Intune |
 | SerialNumber | Hardware serial number |
+| PrimaryUserUPN | User Principal Name of primary device user |
 | LastCheckIn | Last Intune sync date/time |
 | OSVersion | Full OS version (e.g., 10.0.26100.7171) |
 | FeatureUpdateVersion | Windows 11 version (22H2, 23H2, 24H2, 25H2) |
@@ -98,6 +102,7 @@ DESKTOP-004
 | OperatingSystem | OS name |
 | Model | Device model |
 | Manufacturer | Device manufacturer |
+| FreeDiscSpaceGB | Available disk space in gigabytes |
 
 ## 🔧 Configuration
 
@@ -188,6 +193,20 @@ Total: **168 builds** covering all major and preview updates
 ## 📄 License
 
 This script is provided as-is for internal use. Modify as needed for your environment.
+
+## 📝 Changelog
+
+### Version 1.1 (2025-12-05)
+- ✨ Added **Primary User UPN** field to identify device users
+- ✨ Added **Free Disk Space** (in GB) for storage monitoring
+- 📊 Enhanced CSV output with additional device metrics
+
+### Version 1.0 (2025-11-26)
+- 🎉 Initial release
+- ✅ Three input methods: CSV, Manual, Azure AD Group
+- ✅ Windows 11 build database with 168+ builds
+- ✅ Feature update version detection (22H2, 23H2, 24H2, 25H2)
+- ✅ KB article and update type information
 
 ## 🤝 Contributing
 
