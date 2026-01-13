@@ -31,15 +31,22 @@
 .NOTES
     File Name      : OSVersionReport.ps1
     Author         : Ronny Alhelm
-    Version        : 1.1
+    Version        : 1.2
     Creation Date  : 2025-11-25
-    Last Modified  : 2025-12-05
+    Last Modified  : 2026-01-13
     Requirements   : PowerShell 7.0 or higher (PowerShell 5.1 minimum)
     Dependencies   : Microsoft.Graph PowerShell Module
     Required Files : windows11_builds_full.csv (build database)
                      Clients.csv (optional, for CSV input method)
 
 .CHANGES
+    Version 1.2 (2026-01-13):
+    - Added Intune Status (active/inactive) to report output
+    - Added Entra ID Status (enabled/disabled) to report output
+    - Added Days Since Last Check-in calculation
+    - Added Recommended Action based on device status and activity
+    - Enhanced device compliance and management visibility
+    
     Version 1.1 (2025-12-05):
     - Added Primary User UPN (UserPrincipalName) to report output
     - Added Free Disk Space in GB (FreeDiscSpaceGB) to report output
@@ -58,6 +65,7 @@
     2. Required Microsoft Graph Permissions:
        - DeviceManagementConfiguration.Read.All
        - DeviceManagementManagedDevices.Read.All
+       - Device.Read.All (for Entra ID device status)
     
     3. Ensure windows11_builds_full.csv is in the same directory as the script
 
@@ -65,7 +73,7 @@
     Ronny Alhelm with assistance from GitHub Copilot (Claude Sonnet 4.5)
 
 .VERSION
-    1.1 - Added Primary User UPN and Free Disk Space fields
+    1.2 - Added Intune Status and Entra ID Status fields
 
 .EXAMPLE
     PS C:\> .\OSVersionReport.ps1
@@ -92,7 +100,8 @@
     CSV File: ClientReport_YYYYMMDD_HHMMSS.csv
     Contains columns: ComputerName, SerialNumber, PrimaryUserUPN, LastCheckIn, 
     OSVersion, FeatureUpdateVersion, BuildReleaseDate, KBNumber, UpdateType, 
-    LastPatchInstalled, OperatingSystem, Model, Manufacturer, FreeDiscSpaceGB
+    LastPatchInstalled, OperatingSystem, Model, Manufacturer, FreeDiscSpaceGB,
+    IntuneStatus, EntraIDStatus, DaysSinceLastCheckIn, RecommendedAction
 
 .LINK
     GitHub Repository: https://github.com/roalhelm/
@@ -324,6 +333,89 @@ foreach ($client in $clients) {
                 $primaryUserUPN = $device.UserPrincipalName
             }
             
+            # Get Intune Management State
+            $intuneStatus = "Unknown"
+            if ($null -ne $device.ManagementState) {
+                switch ($device.ManagementState) {
+                    "managed" { $intuneStatus = "Active" }
+                    "retirePending" { $intuneStatus = "Retire Pending" }
+                    "retired" { $intuneStatus = "Retired" }
+                    "wipePending" { $intuneStatus = "Wipe Pending" }
+                    "wiped" { $intuneStatus = "Wiped" }
+                    default { $intuneStatus = $device.ManagementState }
+                }
+            }
+            
+            # Get Entra ID (Azure AD) Status
+            $entraIDStatus = "Unknown"
+            try {
+                # Get the Azure AD device ID from Intune device
+                if ($device.AzureAdDeviceId) {
+                    $aadDevice = Get-MgDevice -Filter "deviceId eq '$($device.AzureAdDeviceId)'" -ErrorAction SilentlyContinue
+                    if ($aadDevice) {
+                        $entraIDStatus = if ($aadDevice.AccountEnabled) { "Enabled" } else { "Disabled" }
+                    } else {
+                        $entraIDStatus = "Entra ID Object Not Found"
+                    }
+                } else {
+                    $entraIDStatus = "No Entra ID Link"
+                }
+            }
+            catch {
+                Write-Warning "  Could not retrieve Entra ID status: $_"
+                $entraIDStatus = "Error"
+            }
+            
+            # Calculate Days Since Last Check-in
+            $daysSinceCheckIn = "Unknown"
+            if ($device.LastSyncDateTime) {
+                $daysSinceCheckIn = [math]::Round((Get-Date) - $device.LastSyncDateTime).TotalDays, 0)
+            }
+            
+            # Determine Recommended Action based on status combinations
+            $recommendedAction = "Review Required"
+            
+            # Already inactive/retired in Intune
+            if ($intuneStatus -in @("Retired", "Wiped", "Retire Pending", "Wipe Pending")) {
+                if ($entraIDStatus -eq "Enabled") {
+                    $recommendedAction = "Disable in Entra ID"
+                } else {
+                    $recommendedAction = "Already Inactive"
+                }
+            }
+            # Device not checked in for over 90 days
+            elseif ($daysSinceCheckIn -ne "Unknown" -and $daysSinceCheckIn -gt 90) {
+                if ($entraIDStatus -eq "Enabled" -and $intuneStatus -eq "Active") {
+                    $recommendedAction = "Consider Disabling (>90 days inactive)"
+                } elseif ($entraIDStatus -eq "Disabled") {
+                    $recommendedAction = "Clean up Intune"
+                }
+            }
+            # Device not checked in for 60-90 days
+            elseif ($daysSinceCheckIn -ne "Unknown" -and $daysSinceCheckIn -gt 60) {
+                $recommendedAction = "Monitor (>60 days inactive)"
+            }
+            # Device not checked in for 30-60 days
+            elseif ($daysSinceCheckIn -ne "Unknown" -and $daysSinceCheckIn -gt 30) {
+                $recommendedAction = "Watch (>30 days inactive)"
+            }
+            # Active device
+            elseif ($intuneStatus -eq "Active" -and $entraIDStatus -eq "Enabled") {
+                $recommendedAction = "Keep Active"
+            }
+            # Entra ID disabled but Intune active
+            elseif ($intuneStatus -eq "Active" -and $entraIDStatus -eq "Disabled") {
+                $recommendedAction = "Retire from Intune"
+            }
+            # No Entra ID link
+            elseif ($entraIDStatus -eq "No Entra ID Link") {
+                $recommendedAction = "MDM Only - Review"
+            }
+            # Entra ID object not found
+            elseif ($entraIDStatus -eq "Entra ID Object Not Found") {
+                $recommendedAction = "Entra ID Missing - Clean up Intune"
+            }
+            
             $deviceInfo = [PSCustomObject]@{
                 ComputerName           = $device.DeviceName
                 SerialNumber           = $device.SerialNumber
@@ -339,6 +431,10 @@ foreach ($client in $clients) {
                 Model                  = $device.Model
                 Manufacturer           = $device.Manufacturer
                 FreeDiscSpaceGB        = $freeSpaceGB
+                IntuneStatus           = $intuneStatus
+                EntraIDStatus          = $entraIDStatus
+                DaysSinceLastCheckIn   = $daysSinceCheckIn
+                RecommendedAction      = $recommendedAction
             }
             
             $report += $deviceInfo
@@ -364,6 +460,10 @@ foreach ($client in $clients) {
                 Model                  = "Not found"
                 Manufacturer           = "Not found"
                 FreeDiscSpaceGB        = "Not found"
+                IntuneStatus           = "Not found"
+                EntraIDStatus          = "Not found"
+                DaysSinceLastCheckIn   = "Not found"
+                RecommendedAction      = "Not in Intune - Review"
             }
             
             $report += $deviceInfo
