@@ -17,6 +17,13 @@ A PowerShell script for retrieving detailed Windows 11 device information from M
   - Serial number, manufacturer, model
   - Primary User UPN (User Principal Name)
   - Free Disk Space (in GB)
+- **Management Status**: 
+  - Intune Management Status (Active, Retired, Wiped, etc.)
+  - Entra ID Status (Enabled, Disabled)
+  - Days Since Last Check-in
+- **Smart Recommendations**: 
+  - Automated action recommendations based on device status
+  - Helps identify devices that can be disabled or cleaned up
 - **Last Check-in Time**: Shows when devices last synced with Intune
 - **CSV Export**: Automatic export with timestamp
 - **Comprehensive Build Database**: Includes Windows 11 builds from 2022-2025
@@ -31,6 +38,7 @@ A PowerShell script for retrieving detailed Windows 11 device information from M
 - **Required Permissions**:
   - `DeviceManagementConfiguration.Read.All`
   - `DeviceManagementManagedDevices.Read.All`
+  - `Device.Read.All` (for Entra ID device status)
 
 ## 🚀 Usage
 
@@ -103,6 +111,34 @@ DESKTOP-004
 | Model | Device model |
 | Manufacturer | Device manufacturer |
 | FreeDiscSpaceGB | Available disk space in gigabytes |
+| IntuneStatus | Intune management status (Active, Retired, etc.) |
+| EntraIDStatus | Entra ID device status (Enabled, Disabled, etc.) |
+| DaysSinceLastCheckIn | Days since last Intune check-in |
+| RecommendedAction | Smart recommendation based on device status |
+| IntuneStatus | Intune management status (Active, Retired, etc.) |
+| EntraIDStatus | Entra ID device status (Enabled, Disabled, etc.) |
+| DaysSinceLastCheckIn | Days since last Intune check-in |
+| RecommendedAction | Smart recommendation based on device status |
+
+## 🎯 Recommended Actions
+
+The script automatically analyzes device status and provides smart recommendations:
+
+- **Keep Active** - Device is healthy and should remain active
+- **Watch (>30 days inactive)** - Monitor device activity
+- **Monitor (>60 days inactive)** - Consider deactivation soon
+- **Consider Disabling (>90 days inactive)** - Device likely unused
+- **Disable in Entra ID** - Already retired in Intune, clean up Entra ID
+- **Clean up Intune** - Remove from Intune management
+- **Retire from Intune** - Device disabled in Entra ID
+- **Already Inactive** - Device deactivated in both systems
+- **MDM Only - Review** - No Entra ID link (e.g., BYOD devices)
+- **Not in Intune - Review** - Device not found
+- **Review Required** - Manual review needed
+
+For detailed explanations, see:
+- 🇩🇪 [info.md](info.md) - German documentation
+- 🇬🇧 [info_en.md](info_en.md) - English documentation
 
 ## 🔧 Configuration
 
@@ -138,7 +174,7 @@ Version;Build;Release-Datum;KB;Hinweis
 ```powershell
 # Disconnect and reconnect
 Disconnect-MgGraph
-Connect-MgGraph -Scopes "DeviceManagementConfiguration.Read.All","DeviceManagementManagedDevices.Read.All"
+Connect-MgGraph -Scopes "DeviceManagementConfiguration.Read.All","DeviceManagementManagedDevices.Read.All","Device.Read.All"
 ```
 
 ### Group Not Found (Option 3)
@@ -196,6 +232,14 @@ This script is provided as-is for internal use. Modify as needed for your enviro
 
 ## 📝 Changelog
 
+### Version 1.2 (2026-01-13)
+- ✨ Added **Intune Management Status** tracking
+- ✨ Added **Entra ID Status** (enabled/disabled) checking
+- ✨ Added **Days Since Last Check-in** calculation
+- 🎯 Added **Smart Recommendations** based on device status
+- 📚 Added comprehensive documentation (info.md, info_en.md)
+- 🔐 Enhanced permission requirements (Device.Read.All)
+
 ### Version 1.1 (2025-12-05)
 - ✨ Added **Primary User UPN** field to identify device users
 - ✨ Added **Free Disk Space** (in GB) for storage monitoring
@@ -224,6 +268,6 @@ For issues with:
 
 ---
 
-**Last Updated**: November 2025  
-**Version**: 1.0  
+**Last Updated**: January 2026  
+**Version**: 1.2  
 **Compatibility**: Windows 11 (22H2, 23H2, 24H2, 25H2)
