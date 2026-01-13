@@ -369,7 +369,7 @@ foreach ($client in $clients) {
             # Calculate Days Since Last Check-in
             $daysSinceCheckIn = "Unknown"
             if ($device.LastSyncDateTime) {
-                $daysSinceCheckIn = [math]::Round((Get-Date) - $device.LastSyncDateTime).TotalDays, 0)
+                $daysSinceCheckIn = [math]::Round(((Get-Date) - $device.LastSyncDateTime).TotalDays, 0)
             }
             
             # Determine Recommended Action based on status combinations
