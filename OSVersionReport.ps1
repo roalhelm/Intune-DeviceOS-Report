@@ -101,7 +101,8 @@
     Contains columns: ComputerName, SerialNumber, PrimaryUserUPN, LastCheckIn, 
     OSVersion, FeatureUpdateVersion, BuildReleaseDate, KBNumber, UpdateType, 
     LastPatchInstalled, OperatingSystem, Model, Manufacturer, FreeDiscSpaceGB,
-    IntuneStatus, EntraIDStatus, DaysSinceLastCheckIn, RecommendedAction
+    IntuneStatus, EntraIDStatus, DaysSinceLastCheckIn, IsWipePending, 
+    DuplicateInIntune, DuplicateInEntra, RecommendedAction
 
 .LINK
     GitHub Repository: https://github.com/roalhelm/
@@ -253,10 +254,20 @@ foreach ($client in $clients) {
     Write-Host "Processing: $clientName" -ForegroundColor Yellow
     
     try {
-        # Search for client in Intune
-        $device = Get-MgDeviceManagementManagedDevice -Filter "deviceName eq '$clientName'"
+        # Search for client in Intune - get all devices with this name
+        $devices = @(Get-MgDeviceManagementManagedDevice -Filter "deviceName eq '$clientName'")
         
-        if ($device) {
+        # Check for duplicates in Intune
+        $intuneCount = $devices.Count
+        $duplicateInIntune = if ($intuneCount -gt 1) { "Yes ($intuneCount devices)" } else { "No" }
+        
+        if ($devices.Count -gt 0) {
+            # Use first device for reporting (or most recently synced)
+            $device = $devices | Sort-Object LastSyncDateTime -Descending | Select-Object -First 1
+            
+            if ($intuneCount -gt 1) {
+                Write-Host "  ! Warning: Found $intuneCount devices with name '$clientName' in Intune" -ForegroundColor Yellow
+            }
             # Extract information
             
             # Derive Feature Update Version and Build Release Date from OS Version
@@ -335,20 +346,55 @@ foreach ($client in $clients) {
             
             # Get Intune Management State
             $intuneStatus = "Unknown"
-            if ($null -ne $device.ManagementState) {
-                switch ($device.ManagementState) {
+            $isWipePending = "No"
+            
+            # Check managementState in AdditionalProperties first
+            $managementStateValue = $null
+            if ($device.AdditionalProperties -and $device.AdditionalProperties.ContainsKey('managementState')) {
+                $managementStateValue = $device.AdditionalProperties['managementState']
+            } elseif ($null -ne $device.ManagementState) {
+                $managementStateValue = $device.ManagementState
+            }
+            
+            if ($managementStateValue) {
+                switch ($managementStateValue) {
                     "managed" { $intuneStatus = "Active" }
                     "retirePending" { $intuneStatus = "Retire Pending" }
                     "retired" { $intuneStatus = "Retired" }
-                    "wipePending" { $intuneStatus = "Wipe Pending" }
+                    "wipePending" { 
+                        $intuneStatus = "Wipe Pending"
+                        $isWipePending = "Yes"
+                    }
                     "wiped" { $intuneStatus = "Wiped" }
-                    default { $intuneStatus = $device.ManagementState }
+                    default { $intuneStatus = $managementStateValue }
                 }
             }
             
-            # Get Entra ID (Azure AD) Status
+            # Check Device Action Results for pending wipe (fallback)
+            if ($device.DeviceActionResults) {
+                foreach ($action in $device.DeviceActionResults) {
+                    if ($action.ActionName -eq "wipe" -and $action.ActionState -eq "pending") {
+                        $isWipePending = "Yes"
+                        if ($intuneStatus -eq "Active") {
+                            $intuneStatus = "Active (Wipe Pending)"
+                        }
+                    }
+                }
+            }
+            
+            # Get Entra ID (Azure AD) Status and check for duplicates
             $entraIDStatus = "Unknown"
+            $duplicateInEntra = "No"
             try {
+                # Check for duplicate device names in Entra ID
+                $entraDevicesByName = @(Get-MgDevice -Filter "displayName eq '$clientName'" -ErrorAction SilentlyContinue)
+                $entraCount = $entraDevicesByName.Count
+                
+                if ($entraCount -gt 1) {
+                    $duplicateInEntra = "Yes ($entraCount devices)"
+                    Write-Host "  ! Warning: Found $entraCount devices with name '$clientName' in Entra ID" -ForegroundColor Yellow
+                }
+                
                 # Get the Azure AD device ID from Intune device
                 if ($device.AzureAdDeviceId) {
                     $aadDevice = Get-MgDevice -Filter "deviceId eq '$($device.AzureAdDeviceId)'" -ErrorAction SilentlyContinue
@@ -359,11 +405,13 @@ foreach ($client in $clients) {
                     }
                 } else {
                     $entraIDStatus = "No Entra ID Link"
+                    $duplicateInEntra = "N/A"
                 }
             }
             catch {
                 Write-Warning "  Could not retrieve Entra ID status: $_"
                 $entraIDStatus = "Error"
+                $duplicateInEntra = "Error"
             }
             
             # Calculate Days Since Last Check-in
@@ -434,6 +482,9 @@ foreach ($client in $clients) {
                 IntuneStatus           = $intuneStatus
                 EntraIDStatus          = $entraIDStatus
                 DaysSinceLastCheckIn   = $daysSinceCheckIn
+                IsWipePending          = $isWipePending
+                DuplicateInIntune      = $duplicateInIntune
+                DuplicateInEntra       = $duplicateInEntra
                 RecommendedAction      = $recommendedAction
             }
             
@@ -463,6 +514,9 @@ foreach ($client in $clients) {
                 IntuneStatus           = "Not found"
                 EntraIDStatus          = "Not found"
                 DaysSinceLastCheckIn   = "Not found"
+                IsWipePending          = "Not found"
+                DuplicateInIntune      = "Not found"
+                DuplicateInEntra       = "Not found"
                 RecommendedAction      = "Not in Intune - Review"
             }
             
