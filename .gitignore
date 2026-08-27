@@ -1,0 +1,6 @@
+# matches any files and directories with the name clientReport
+clientReport*
+
+Clients.csv
+
+windows11_builds_full.csv.20*
