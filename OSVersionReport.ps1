@@ -111,6 +111,12 @@
 
 #>
 
+# Warn if the script is not running on PowerShell 7+
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    Write-Warning "Dieses Skript wird aktuell mit PowerShell $($PSVersionTable.PSVersion) ausgefuehrt. Empfohlen ist PowerShell 7 oder hoeher."
+    Write-Host "Hinweis: Installation und Download unter https://aka.ms/powershell" -ForegroundColor Yellow
+}
+
 # Connect to Microsoft Graph
 Connect-MgGraph
 
