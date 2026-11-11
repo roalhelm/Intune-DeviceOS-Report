@@ -2,7 +2,7 @@
 
 A PowerShell script for retrieving detailed Windows 11 device information from Microsoft Intune, including OS versions, build numbers, KB updates, and hardware details.
 
-## 🎯 Features
+## Features
 
 - **Multiple Input Methods**: 
   - CSV file with computer names
@@ -28,7 +28,7 @@ A PowerShell script for retrieving detailed Windows 11 device information from M
 - **CSV Export**: Automatic export with timestamp
 - **Comprehensive Build Database**: Includes Windows 11 builds from 2022-2025
 
-## 📋 Prerequisites
+## Prerequisites
 
 - **PowerShell 7.0+** recommended
 - **Microsoft Graph PowerShell SDK**:
@@ -40,7 +40,7 @@ A PowerShell script for retrieving detailed Windows 11 device information from M
   - `DeviceManagementManagedDevices.Read.All`
   - `Device.Read.All` (for Entra ID device status)
 
-## 🚀 Usage
+## Usage
 
 ### 1. Run the Script
 
@@ -71,7 +71,7 @@ When prompted, select one of three options:
 - Final report displays in table format
 - CSV export saved with timestamp: `ClientReport_YYYYMMDD_HHMMSS.csv`
 
-## 📁 File Structure
+## File Structure
 
 ```
 Reports/
@@ -81,7 +81,7 @@ Reports/
 └── ClientReport_*.csv           # Generated reports
 ```
 
-## 📝 Input File Format
+## Input File Format
 
 Create `Clients.csv` with the following format:
 
@@ -93,7 +93,7 @@ LAPTOP-003
 DESKTOP-004
 ```
 
-## 📊 Output Columns
+## Output Columns
 
 | Column | Description |
 |--------|-------------|
@@ -120,7 +120,7 @@ DESKTOP-004
 | DaysSinceLastCheckIn | Days since last Intune check-in |
 | RecommendedAction | Smart recommendation based on device status |
 
-## 🎯 Recommended Actions
+## Recommended Actions
 
 The script automatically analyzes device status and provides smart recommendations:
 
@@ -137,10 +137,10 @@ The script automatically analyzes device status and provides smart recommendatio
 - **Review Required** - Manual review needed
 
 For detailed explanations, see:
-- 🇩🇪 [info.md](info.md) - German documentation
-- 🇬🇧 [info_en.md](info_en.md) - English documentation
+- [info.md](info.md) - German documentation
+- [info_en.md](info_en.md) - English documentation
 
-## 🔧 Configuration
+## Configuration
 
 ### Modify CSV Path (Option 1)
 Edit line in script if using custom path:
@@ -163,7 +163,7 @@ Version;Build;Release-Datum;KB;Hinweis
 - **KB**: KB article number or "—" for releases
 - **Hinweis**: Update type description
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### "Build not in database"
 - Check console output for missing build number
@@ -187,7 +187,7 @@ Connect-MgGraph -Scopes "DeviceManagementConfiguration.Read.All","DeviceManageme
 - Verify devices are enrolled in Intune
 - Ensure devices are not retired/deleted
 
-## 📚 Examples
+## Examples
 
 ### Example 1: Quick Check for Single Device
 ```powershell
@@ -210,7 +210,7 @@ Connect-MgGraph -Scopes "DeviceManagementConfiguration.Read.All","DeviceManageme
 # Enter: IT-Department-Devices
 ```
 
-## 📅 Build Database Coverage
+## Build Database Coverage
 
 - **Windows 11 22H2**: 78 builds (Sep 2022 - Oct 2025)
 - **Windows 11 23H2**: 60 builds (Oct 2023 - Nov 2025)
@@ -219,47 +219,47 @@ Connect-MgGraph -Scopes "DeviceManagementConfiguration.Read.All","DeviceManageme
 
 Total: **168 builds** covering all major and preview updates
 
-## 🔐 Security Notes
+## Security Notes
 
 - Script requires read-only permissions
 - No data is modified in Intune
 - Exports contain sensitive information (serial numbers, device names)
 - Store reports securely and follow your organization's data handling policies
 
-## 📄 License
+## License
 
 This script is provided as-is for internal use. Modify as needed for your environment.
 
-## 📝 Changelog
+## Changelog
 
 ### Version 1.2 (2026-01-13)
-- ✨ Added **Intune Management Status** tracking
-- ✨ Added **Entra ID Status** (enabled/disabled) checking
-- ✨ Added **Days Since Last Check-in** calculation
-- 🎯 Added **Smart Recommendations** based on device status
-- 📚 Added comprehensive documentation (info.md, info_en.md)
-- 🔐 Enhanced permission requirements (Device.Read.All)
+- Added **Intune Management Status** tracking
+- Added **Entra ID Status** (enabled/disabled) checking
+- Added **Days Since Last Check-in** calculation
+- Added **Smart Recommendations** based on device status
+- Added comprehensive documentation (info.md, info_en.md)
+- Enhanced permission requirements (Device.Read.All)
 
 ### Version 1.1 (2025-12-05)
-- ✨ Added **Primary User UPN** field to identify device users
-- ✨ Added **Free Disk Space** (in GB) for storage monitoring
-- 📊 Enhanced CSV output with additional device metrics
+- Added **Primary User UPN** field to identify device users
+- Added **Free Disk Space** (in GB) for storage monitoring
+- Enhanced CSV output with additional device metrics
 
 ### Version 1.0 (2025-11-26)
-- 🎉 Initial release
-- ✅ Three input methods: CSV, Manual, Azure AD Group
-- ✅ Windows 11 build database with 168+ builds
-- ✅ Feature update version detection (22H2, 23H2, 24H2, 25H2)
-- ✅ KB article and update type information
+- Initial release
+- Three input methods: CSV, Manual, Azure AD Group
+- Windows 11 build database with 168+ builds
+- Feature update version detection (22H2, 23H2, 24H2, 25H2)
+- KB article and update type information
 
-## 🤝 Contributing
+## Contributing
 
 To add missing builds or improvements:
 1. Test changes thoroughly
 2. Update build database with official Microsoft sources
 3. Document changes in this README
 
-## 📞 Support
+## Support
 
 For issues with:
 - **Script functionality**: Check troubleshooting section above
